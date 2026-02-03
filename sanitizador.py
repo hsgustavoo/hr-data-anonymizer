@@ -1,32 +1,65 @@
 import pandas as pd
-#Python, chama o especialista em Excel e Tabelas (Pandas). E para eu não ter que ficar escrevendo 'pandas' toda hora, vou chamar ele pelo apelido de 'pd'.
+import re  # Para limpeza de caracteres (Regex)
+import os  # Para lidar com caminhos de pastas no Windows
 
-df = pd.read_excel("dados_rh.xlsx")
-#Ei, Pandas, lê esse arquivo Excel chamado "dados_rh.xlsx" que está na pasta e guarda ele na memória do computador.
-#A sigla 'df' é uma abreviação comum para 'DataFrame'. Imagine que essa sigla é a planilha aberta voando na memória RAM do seu computador. Tudo que fizermos, faremos no 'df', sem estragar o arquivo original.
+print("--- 🚀 Iniciando o processamento ---")
 
+# --- 1. CONFIGURAÇÃO INTELIGENTE DE CAMINHOS ---
+# Descobre onde este script (sanitizador.py) está salvo no seu PC
+diretorio_script = os.path.dirname(os.path.abspath(__file__))
+
+# Monta o caminho exato para a pasta 'dados' baseada na posição do script
+# Isso resolve o erro de "File Not Found" mesmo se o terminal estiver na pasta errada
+caminho_entrada = os.path.join(diretorio_script, "dados", "dados_rh.xlsx")
+caminho_saida = os.path.join(diretorio_script, "dados", "dados_publicos.xlsx")
+
+# --- 2. CARREGAMENTO DO ARQUIVO ---
+try:
+    print(f"📂 Procurando arquivo em: {caminho_entrada}")
+    df = pd.read_excel(caminho_entrada)
+    print(f"✅ Arquivo carregado! Encontrei {len(df)} colaboradores.")
+
+except FileNotFoundError:
+    print("\n❌ ERRO CRÍTICO: O arquivo não foi encontrado!")
+    print(f"Certifique-se que 'dados_rh.xlsx' está dentro da pasta: {os.path.join(diretorio_script, 'dados')}")
+    exit() # Para o código aqui
+
+# --- 3. FUNÇÃO DE ANONIMIZAÇÃO ---
 def mascarar_cpf(cpf):
+    # Converte para texto
     cpf_str = str(cpf)
-    cpf_str = cpf_str.zfill(11)
-    #"Zero Fill" Preencher com zeros
-    #O Excel tem uma mania feia, ele acha que CPF é número matemático. Se o CPF começar com zero, ele corta o zero. Então, para garantir que todo CPF tenha 11 dígitos, o comando zfill(11) adiciona zeros à esquerda, se necessário.
-    return cpf_str[:3] + ".***.***-**"
-#def significa "atenção, vou definir uma regra chamada mascarar_cpf".
-#cpf_str = str(cpf) "Pega o CPF que você recebeu e transforme ele em texto (string), pra eu poder cortar ele em pedaços."
-#"cpf_str[:3}:"Pega só os três primeiros números do CPF.
-#+ ... :"Cola esse final cheio de asteriscos no lugar do resto".
+    
+    # TRATAMENTO DE ERRO: Se a célula estiver vazia (nan), retorna N/A
+    if cpf_str == 'nan':
+        return "N/A"
+    
+    # LIMPEZA: Remove tudo que NÃO for número (pontos, traços, espaços)
+    # Regex: [^0-9] significa "qualquer coisa que não seja 0 a 9"
+    cpf_limpo = re.sub(r'[^0-9]', '', cpf_str)
+    
+    # Garante 11 dígitos com zeros à esquerda
+    cpf_cheio = cpf_limpo.zfill(11)
+    
+    # Aplica a máscara (Ex: 123.***.***-**)
+    return cpf_cheio[:3] + ".***.***-**"
 
-df['CPF_Anonimizado'] = df['CPF'].apply(mascarar_cpf)
-#df{'CPF'}:"Olha só para a coluna CPF".
-#.apply(mascarar_cpf): Aplicar aquela regra que eu ensinei em CADA UMA das linhas, uma por uma, automaticamente".
-#df['CPF_Anonimizado'] = : "Guarda o resultado numa coluna nova chamada 'CPF_Anonimizado'".
+print("--- 🎭 Anonimizando CPFs... ---")
 
-#Aqui está o comando que remove a coluna original de CPF, que não queremos mais.
-#O comando .drop joga fora a coluna CPF
-#O axis=1 avisa que é para procurar ha horizontal (coluna), não linhas.
-df = df.drop(columns=['CPF'])
+# --- 4. APLICAÇÃO E SALVAMENTO ---
+try:
+    # Aplica a função linha por linha
+    df['CPF_Anonimizado'] = df['CPF'].apply(mascarar_cpf)
+    
+    # Remove a coluna original (Perigosa)
+    df = df.drop(columns=['CPF'])
+    
+    # Salva o resultado no caminho de saída configurado lá em cima
+    df.to_excel(caminho_saida, index=False)
+    
+    print(f"\n✅ SUCESSO! Arquivo salvo em: {caminho_saida}")
 
-df.to_excel("dados_publicos.xlsx", index=False)
-#O que significa: estagiário, pega essa planilha que está na memória (df), com as alterações que fizemos, e salva num arquivo novo chamado 'dados_publicos.xlsx'
-
-print("Sucesso! A coluna 'CPF' original foi destruída e o arquivo está seguro.")
+except KeyError:
+    print("\n❌ ERRO NA PLANILHA: Não achei a coluna 'CPF'.")
+    print("Verifique se no Excel a coluna está escrita como 'cpf', 'C.P.F' ou tem espaços extras.")
+except Exception as e:
+    print(f"\n❌ Erro inesperado: {e}")
