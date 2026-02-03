@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- Meus Bloqueios de Segurança (RH) ---
+# Ignorar planilhas de dados
+*.xlsx
+*.xls
+*.csv
+
+# Ignorar pasta de dados (opcional, mas recomendado)
+dados/
+data/
